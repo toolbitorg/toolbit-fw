@@ -1,6 +1,6 @@
 /*
- *  Toolbit DMM firmware
- *  Copyright (C) 2020 Junji Ohama <junji.ohama@toolbit.org>
+ *  ChoppyUSB firmware
+ *  Copyright (C) 2020 Junji Ohama <jun2ohama@gmail.com>
  *
  *  This program is distributed in the hope that it will be useful, but WITHOUT
  *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -12,8 +12,8 @@
  *
  */
 
-#ifndef DMM_FUNC_H__
-#define DMM_FUNC_H__
+#ifndef CHOPPY_FUNC_H__
+#define CHOPPY_FUNC_H__
 
 #include <xc.h>
 #include <stdint.h>
@@ -23,18 +23,34 @@
 #define NVM_ADDR      0x1FA1
 #define NVM_NUM_OF_BYTE_DATA 4
 
-void dmm_init();
+#define TRIGGER_MODE_NONE       0
+#define TRIGGER_MODE_NORMAL     1
+#define TRIGGER_MODE_CONTINUOUS 2
+
+#define LED0_ON()       RC2 = 1   // PORTCbits.RC2 = 1
+#define LED0_OFF()      RC2 = 0   // PORTCbits.RC2 = 0
+#define LED0_TOGGLE()   RC2 = !RC2
+
+
+void choppy_init();
 void i2c_reg_write(uint8_t regAddr, uint8_t dat0, uint8_t dat1);
 uint16_t i2c_reg_read(uint8_t regAddr);
-int16_t get_shunt_voltage(uint8_t regAddr);
-void set_autorange_threshould();
+uint24_t i2c_reg_read_3bytes(uint8_t regAddr);
 
+void config_monitor_reg();
+void enable_timer2();
+void disable_timer2();
+uint16_t check_diag_alert();
+
+int24_t get_shunt_voltage(uint8_t regAddr);
 float get_voltage();
 float get_current();
 
+uint8_t get_color();
+void set_color(uint8_t val);
+
 uint8_t selftest();
-void cal_offset();
-void set_parameters();
+uint8_t set_parameters_by_rid();
 void blink_led(uint8_t cnt);
 
 

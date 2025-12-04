@@ -1,6 +1,6 @@
 /*
- *  Toolbit DMM firmware
- *  Copyright (C) 2020 Junji Ohama <junji.ohama@toolbit.org>
+ *  ChoppyUSB firmware
+ *  Copyright (C) 2024 Junji Ohama <junji.ohama@toolbit.org>
  *
  *  This program is distributed in the hope that it will be useful, but WITHOUT
  *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -36,7 +36,8 @@ typedef enum
 	OP_ATT_VALUE_SET,
 	OP_ATT_VALUE_GET,
 	// Event Code
-	EVT_NOTIFY = 0xA0
+	OP_INTERRUPT_TRANSFER = 0xA0,
+	OP_EVT_NOTIFY = 0xA1
 } OperationCode;
 
 typedef enum
@@ -56,15 +57,19 @@ typedef enum
     ATT_FIRM_VERSION     = 0x0004,
 
     // Platform commom attribute ID
+    ATT_RESET            = 0x1100,
     ATT_I2C0_DEVICE_ADDR = 0x1400,
     ATT_I2C0_REG_ADDR    = 0x1401,
     ATT_I2C0_RW_1BYTE    = 0x1402,
     ATT_I2C0_RW_2BYTE    = 0x1403,
+    ATT_I2C0_RW_3BYTE    = 0x1404,
 
     // Product specific attribute ID
-    ATT_CALIBRATION      = 0x8100,
+    ATT_TRIGGER_MODE     = 0x8000,
+    ATT_COLOR            = 0x8100,
     ATT_VOLTAGE          = 0x8101,
 	ATT_CURRENT          = 0x8102
+
 } AttributionID;
 
 /*
@@ -77,9 +82,10 @@ struct Attribution{
  */
 
 static const ROMPTR char VENDOR_NAME[]      = "Toolbit";
-static const ROMPTR char PRODUCT_NAME[]     = "DMM";
-static const ROMPTR char FIRM_VERSION[]     = "1.0";
-// If PA5 input is high/low, PRODUCT_REVISION = 0/1
+static const ROMPTR char PRODUCT_NAME[]     = "Choppy";
+static const ROMPTR char FIRM_VERSION[]     = "0.2";
+// 0.1: first distributed version
+// 0.2: Support interrupt-driven data transfer
 
 // The serial number provided by 'USB 512-Word DFU Bootloader for PIC16(L)F1454/5/9' as follows as
 //      0x81EE: one byte length

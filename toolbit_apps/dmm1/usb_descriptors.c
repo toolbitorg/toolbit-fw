@@ -203,7 +203,7 @@ static const ROMPTR struct {uint8_t bLength;uint8_t bDescriptorType; uint16_t ch
 static const ROMPTR struct {uint8_t bLength;uint8_t bDescriptorType; uint16_t chars[4]; } product_string = {
 	sizeof(product_string),
 	DESC_STRING,
-	{'D','M','M', 0x00}  // It seems like 4 characters are required for some reasons
+	{'D','M','M', '1'}  // It seems like 4 characters are required for some reasons
 };
 
 

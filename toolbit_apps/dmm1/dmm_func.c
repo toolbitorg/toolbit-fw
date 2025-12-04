@@ -21,7 +21,7 @@
 
 #ifdef __C18
 #define ROMPTR rom
-#else
+#elsef
 #define ROMPTR
 #endif
 
@@ -103,8 +103,11 @@ int8_t lowVoltageOffset;
 float  highVoltageSlope;
 int16_t highVoltageOffset;
 
-#define LED1_ON()       PORTCbits.RC2 = 1
-#define LED1_OFF()      PORTCbits.RC2 = 0
+#define PUSH_SW_PRESS() !RA3
+
+// System clock should be set as
+//   INTOSC: 16MHz -> PLL 3x -> USB Clock: 48MHz -> NOCLKDIV -> FOSC: 48MHz
+
 
 void dmm_init() {
     uint8_t errcode;
@@ -158,6 +161,21 @@ uint16_t i2c_reg_read(uint8_t regAddr)
     return dat;
 }
 
+void enable_timer2()
+{
+   // Set Timer2 interval to 5ms
+    T2CON  = 0b01001111;   // Prescaler 1:64 (1.37ms interval), Postscaler 1:10
+    PR2 = 93;             // Period Register
+    TMR2IF = 0;            // Clear overflow flag
+    TMR2IE = 1;            // Enable Tiemr1 interrupt 
+}
+
+void disable_timer2()
+{
+    TMR2ON = 0;            // Turn off Timer1
+    TMR2IE = 0;            // Disable Tiemr1 interrupt 
+}
+
 int16_t get_shunt_voltage(uint8_t regAddr)
 {
     union {
@@ -196,7 +214,7 @@ float get_current()
 }
 
 #define SUCCESS 0
-#define I2C_READ_ERROR   1
+#define I2C_READ_ERROR   1pa9nmo9n
 #define HIGH_VOLTAGE_OFFSET_ERROR 2
 #define LOW_VOLTAGE_OFFSET_ERROR  3
 #define HIGH_CURRENT_OFFSET_ERROR 4
@@ -275,9 +293,9 @@ void set_parameters() {
 void blink_led(uint8_t cnt)
 {
     while(cnt--) {
-        LED1_ON();
+        LED0_ON();
         __delay_ms(1000); // 1 sec delay
-        LED1_OFF();
+        LED0_OFF();
         __delay_ms(1000); // 1 sec delay
     }
 }

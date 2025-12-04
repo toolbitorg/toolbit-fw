@@ -27,12 +27,30 @@
 #include "dmm_func.h"
 
 
+uint8_t trigger_mode;
+
+
+#define TRANSFER_DATA_BUF_SIZE 4
+#define TRANSFER_DATA_EMPTY    0
+#define TRANSFER_DATA_FULL     TRANSFER_DATA_BUF_SIZE
+#define TRANSFER_DATA_DISABLE  255
+
+uint8_t transfer_data_cnt;
+uint8_t transfer_data_buf[8*TRANSFER_DATA_BUF_SIZE];
+float latest_volt;
+float latest_curr;
+
 #ifdef MULTI_CLASS_DEVICE
 static uint8_t hid_interfaces[] = {0};
 #endif
 
 
 int main(void) {
+    
+    // Set these variables before initialization
+    trigger_mode = TRIGGER_MODE_NONE;
+    transfer_data_cnt = TRANSFER_DATA_DISABLE;
+
     hardware_init();
 
     dmm_init();
@@ -132,16 +150,18 @@ int main(void) {
 
                                 case ATT_VOLTAGE:
                                     TxDataBuffer[0] |= 4 + 3; // packet length
-                                    float volt = get_voltage();
                                     TxDataBuffer[3] = 0x00;
-                                    memcpy(&TxDataBuffer[4], &volt, 3);
+                                    GIE = 0;  // Disable interrupt
+                                    memcpy(&TxDataBuffer[4], &latest_volt, 3);
+                                    GIE = 1;  // Enable Interrupt
                                     break;
 
                                 case ATT_CURRENT:
                                     TxDataBuffer[0] |= 4 + 3; // packet length
-                                    float curr = get_current();
                                     TxDataBuffer[3] = 0x00;
-                                    memcpy(&TxDataBuffer[4], &curr, 3);
+                                    GIE = 0;  // Disable interrupt
+                                    memcpy(&TxDataBuffer[4], &latest_curr, 3);
+                                    GIE = 1;  // Enable Interrupt
                                     break;
 
                                 default:
@@ -152,11 +172,15 @@ int main(void) {
                             } // end of switch (id)
                             break;
 
-                        case  OP_ATT_VALUE_SET:
+                        case OP_ATT_VALUE_SET:
                             TxDataBuffer[0] = PROTOCOL_VERSION | 3; // packet length
                             TxDataBuffer[2] = RC_OK; // Return OK code
 
                             switch (id) {
+                                
+                                case ATT_RESET:
+                                    WDTCON = 1;
+                                    break;
 
                                 case ATT_I2C0_DEVICE_ADDR:
                                     // Nothing to do because I2C device address is fixed
@@ -173,6 +197,19 @@ int main(void) {
                                 case ATT_CALIBRATION:
                                     cal_offset();
                                     set_parameters();
+                                    break;
+
+                                case ATT_TRIGGER_MODE:
+                                    trigger_mode = RxDataBuffer[4];
+                                    if(trigger_mode==TRIGGER_MODE_NORMAL) {
+                                        transfer_data_cnt = TRANSFER_DATA_DISABLE;
+                                        enable_timer2();
+                                    } else if(trigger_mode==TRIGGER_MODE_CONTINUOUS) {
+                                        transfer_data_cnt = TRANSFER_DATA_EMPTY;
+                                        enable_timer2();
+                                    } else {
+                                        disable_timer2();
+                                    }
                                     break;
 
                                 default:
@@ -197,6 +234,36 @@ int main(void) {
             }
             usb_arm_out_endpoint(1);
         }
+        else if (usb_is_configured()) {
+
+            // When usb_out_endpoint_has_data(1) is false, check send_interrupt
+            if(trigger_mode==TRIGGER_MODE_CONTINUOUS && transfer_data_cnt==TRANSFER_DATA_FULL) {
+            
+                unsigned char *TxDataBuffer = usb_get_in_buffer(1);
+
+                if (!usb_in_endpoint_halted(1)) {
+                    /* Wait for EP 1 IN to become free then send. This of
+                     * course only works using interrupts. */
+                    while (usb_in_endpoint_busy(1)) {
+                        ;
+                    }
+                    
+                    TxDataBuffer[0] = 8*TRANSFER_DATA_BUF_SIZE + 2;
+                    TxDataBuffer[1] = OP_INTERRUPT_TRANSFER;
+
+                    GIE = 0;  // Disable interrupt
+                    memcpy(&TxDataBuffer[2], transfer_data_buf, 8*TRANSFER_DATA_BUF_SIZE);
+                    GIE = 1;  // Enable Interrupt
+                
+                    memcpy(usb_get_in_buffer(1), TxDataBuffer, EP_1_IN_LEN);
+                    usb_send_in_buffer(1, EP_1_IN_LEN);
+
+                    transfer_data_cnt = TRANSFER_DATA_EMPTY;
+                } else {
+                    ;
+                }
+            }
+        }
 
 #ifndef USB_USE_INTERRUPTS
         usb_service();
@@ -208,7 +275,6 @@ int main(void) {
 
 /* Callbacks. These function names are set in usb_config.h. */
 void app_set_configuration_callback(uint8_t configuration) {
-
 }
 
 uint16_t app_get_device_status_callback() {
@@ -216,7 +282,6 @@ uint16_t app_get_device_status_callback() {
 }
 
 void app_endpoint_halt_callback(uint8_t endpoint, bool halted) {
-
 }
 
 int8_t app_set_interface_callback(uint8_t interface, uint8_t alt_setting) {
@@ -318,7 +383,22 @@ int8_t app_set_protocol_callback(uint8_t interface, uint8_t report_id) {
 #ifdef _PIC14E
 
 void interrupt isr() {
+
     usb_service();
+    
+    if(TMR2IF){
+        TMR2IF = 0;
+
+        latest_curr = get_current();
+        latest_volt = get_voltage();
+        if(transfer_data_cnt<TRANSFER_DATA_FULL) {
+            transfer_data_buf[8*transfer_data_cnt] = 0x00;
+            transfer_data_buf[8*transfer_data_cnt+4] = 0x00;
+            memcpy(&transfer_data_buf[8*transfer_data_cnt+1], &latest_volt, 3);
+            memcpy(&transfer_data_buf[8*transfer_data_cnt+5], &latest_curr, 3);           
+            transfer_data_cnt++;
+        }
+    }
 }
 #elif _PIC18
 
